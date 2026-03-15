@@ -255,6 +255,26 @@ export function registerRoutes(httpServer: Server, app: Express) {
       res.status(500).json({ error: err.message });
     }
   });
+
+  // ── 제품 메모 API (localStorage 백업용) ──────────────────────────────────────
+  const _memoStore = new Map<string, any>();
+
+  app.get("/api/memo/:key", (req, res) => {
+    const key = req.params.key;
+    res.json({ key, data: _memoStore.get(key) || null });
+  });
+
+  app.post("/api/memo/:key", (req, res) => {
+    const key = req.params.key;
+    _memoStore.set(key, req.body);
+    res.json({ success: true, key });
+  });
+
+  app.delete("/api/memo/:key", (req, res) => {
+    const key = req.params.key;
+    _memoStore.delete(key);
+    res.json({ success: true });
+  });
 }
 
 // 익스텐션에서 받은 데이터를 GPT 프롬프트용 content 문자열로 바꾸기

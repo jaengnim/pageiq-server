@@ -20,14 +20,21 @@ export interface AnalysisResult {
   scores: Scores;
   modules: Modules;
   target: TargetProfile;
-  topStrengths: string[];
-  topWeaknesses: string[];
-  urgentFixes: string[];
+  topStrengths: any[];
+  topWeaknesses: any[];
+  urgentFixes: any[];
   oneLinerDiagnosis: string;
   inflowScenarios: InflowScenario[];
   // Phase 2 additions
   externalData?: ExternalSearchData;
   improvementGuide?: ImprovementGuide;
+  // Phase 3: level3 deep analysis
+  level3?: {
+    priorityTable?: { timeframe: string; action: string; expectedEffect: string }[];
+    newPageStructure?: { step: string; sectionName: string; headline: string; subCopy: string; visual: string; whyNeeded: string }[];
+    imageDirectionList?: { no: number; type: string; content: string; direction: string; purpose: string; aiPrompt: string }[];
+    coreVariables?: any;
+  };
 }
 
 export interface BasicInfo {
@@ -57,6 +64,7 @@ export interface ModuleResult {
   problem: string;
   improvement: string;
   example: string;
+  subScores?: { name: string; score: number }[];
 }
 
 export interface Modules {
@@ -83,6 +91,8 @@ export interface TargetProfile {
   buyingMotivation: string;
   buyingBarrier: string;
   confidence: number;
+  persona?: string;
+  scenarios?: string[];
 }
 
 export interface InflowScenario {
@@ -136,14 +146,19 @@ export interface VisualItem {
   aiVideoPrompt?: string;
   size: string;
   priority: "필수" | "권장" | "선택";
+  shootingDirection?: string;
+  replaceInstructions?: string;
 }
 
 export interface PageSection {
   order: number;
+  pacesStep?: string;
   sectionName: string;
   purpose: string;
   contentDescription: string;
   copyExample: string;
+  copyBefore?: string;
+  copyAfter?: string;
   visualNeeded: VisualItem[];
   whyImproved: string;
 }
@@ -171,9 +186,35 @@ export interface ImprovementGuide {
     painPoints: string[];
     desiredOutcome: string;
     toneAndManner: string;
+    persona?: string;
+    scenarios?: string[];
   };
   pageStructure: PageSection[];
   copywriting: CopyGuide;
   visualGuide: VisualGuide;
   differenceFromOriginal: string[];
+  improvementPriority?: {
+    immediate: { action: string; expectedEffect: string }[];
+    shortTerm: { action: string; expectedEffect: string }[];
+    midTerm: { action: string; expectedEffect: string }[];
+  };
+  coreVariables?: {
+    targetCustomer: string;
+    coreProblem: string;
+    strongestSellingPoint: string;
+    hesitationReasons: string[];
+    trustEvidence: string[];
+    reviewHighlights: string[];
+    mustShowScenes: string[];
+    mustHaveFAQ: { q: string; a: string }[];
+    toneAndManner: string;
+    persuasionStructure: string;
+  };
+  estimatedCost?: {
+    analysisGPT: string;
+    improvementGPT: string;
+    pageGenerationGPT: string;
+    totalPerSession: string;
+    note: string;
+  };
 }
