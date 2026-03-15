@@ -1,0 +1,10 @@
+{
+  "name": "pageiq-server",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "node index.cjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
