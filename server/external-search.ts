@@ -148,12 +148,25 @@ export async function searchNaver(productName: string): Promise<NaverSearchResul
 // ── YouTube Search ────────────────────────────────────────────────────────────
 export async function searchYouTube(productName: string): Promise<YouTubeSearchResult> {
   try {
-    const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(productName + " 리뷰")}&maxResults=10&order=viewCount&type=video&key=${YOUTUBE_API_KEY}`;
-    const searchRes = await fetch(searchUrl, { signal: AbortSignal.timeout(8000) });
-    if (!searchRes.ok) throw new Error(`YouTube search API error: ${searchRes.status}`);
-    const searchData = await searchRes.json();
+    // 브랜드명 검색과 카테고리 키워드 검색 모두 시도
+    const queries = [
+      productName + " 리뷰",
+      productName.split(" ").slice(-2).join(" ") + " 리뷰", // 상품명 뒷부분
+    ];
+    
+    let items: any[] = [];
+    for (const q of queries) {
+      const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(q)}&maxResults=10&order=viewCount&type=video&regionCode=KR&key=${YOUTUBE_API_KEY}`;
+      const searchRes = await fetch(searchUrl, { signal: AbortSignal.timeout(8000) });
+      if (!searchRes.ok) continue;
+      const searchData = await searchRes.json();
+      const foundItems = (searchData.items || []).filter((v: any) => v.id?.videoId);
+      if (foundItems.length > 0) {
+        items = foundItems;
+        break; // 결과 있으면 첫 번째 쿼리 사용
+      }
+    }
 
-    const items = searchData.items || [];
     const videoIds = items.map((v: any) => v.id?.videoId).filter(Boolean).join(",");
 
     let videos: any[] = [];
@@ -182,7 +195,7 @@ export async function searchYouTube(productName: string): Promise<YouTubeSearchR
 
     return {
       videos: videos.slice(0, 8),
-      totalCount: searchData.pageInfo?.totalResults || 0,
+      totalCount: items.length,
       hasHighViewVideo: hasHighView,
       recentUploadCount: recentCount,
     };
