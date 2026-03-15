@@ -227,7 +227,16 @@ export function registerRoutes(httpServer: Server, app: Express) {
 
       // GPT 분석
       const result = await analyzeWithContent(url || "", content, apiKey);
-      const productName = result.basicInfo?.productName || "";
+
+      // ★ productName fallback: GPT가 추출 못하면 URL에서 추출
+      let productName = result.basicInfo?.productName || "";
+      if (!productName && url) {
+        productName = extractProductNameFromUrl(url);
+        if (productName && result.basicInfo) {
+          result.basicInfo.productName = productName;
+        }
+      }
+      console.log(`[PageIQ] /api/analyze-extension — productName: "${productName}"`);
 
       let externalData = null;
       let improvementGuide = null;
@@ -249,37 +258,78 @@ export function registerRoutes(httpServer: Server, app: Express) {
 }
 
 // 익스텐션에서 받은 데이터를 GPT 프롬프트용 content 문자열로 바꾸기
+// ★ content.js v1.3.0 이후: flat 구조로 전달됨
+// ★ 구버전 호환: sections 중첩 구조도 처리
 function buildContentFromExtension(textData: any, imageUrls: string[]): string {
   if (!textData) return "";
 
+  // sections 중첩 구조(구버전) → flat으로 언래핑
+  const d = textData.sections ? textData.sections : textData;
+
   const parts: string[] = [];
 
-  if (textData.productName) parts.push(`[\uc0c1\ud488\uba85] ${textData.productName}`);
-  if (textData.price) parts.push(`[\uac00\uaca9] ${textData.price}`);
-  if (textData.discount) parts.push(`[\ud560\uc778] ${textData.discount}`);
-  if (textData.rating) parts.push(`[\ud3c9\uc810] ${textData.rating}`);
-  if (textData.reviewCount) parts.push(`[\ub9ac\ube37\uc218] ${textData.reviewCount}`);
-  if (textData.seller) parts.push(`[\ud310\ub9e4\uc790] ${textData.seller}`);
-
-  if (textData.options && textData.options.length > 0) {
-    parts.push(`[\uc635\uc158] ${textData.options.join(" / ")}`);
+  // ★ URL에서 상품명 fallback 추출
+  function extractNameFromUrl(url: string): string {
+    if (!url) return "";
+    try {
+      const u = new URL(url);
+      const segs = u.pathname.split("/").filter(Boolean);
+      for (let i = segs.length - 1; i >= 0; i--) {
+        const decoded = decodeURIComponent(segs[i]);
+        if (/[가-힣]/.test(decoded)) return decoded;
+      }
+    } catch {}
+    return "";
   }
 
-  if (textData.description) {
-    parts.push(`\n[\uc0c1\uc138 \uc124\uba85]\n${textData.description.slice(0, 5000)}`);
+  const productName = d.productName || extractNameFromUrl(textData.url || "");
+
+  if (productName) parts.push(`[상품명] ${productName}`);
+  if (d.price) parts.push(`[가격] ${d.price}`);
+  if (d.discount) parts.push(`[할인] ${d.discount}`);
+  if (d.rating) parts.push(`[평점] ${d.rating}`);
+  if (d.reviewCount) parts.push(`[리뷰수] ${d.reviewCount}`);
+  if (d.seller) parts.push(`[판매자] ${d.seller}`);
+  if (d.platform) parts.push(`[플랫폼] ${d.platform}`);
+  if (textData.url) parts.push(`[URL] ${textData.url}`);
+
+  if (d.options && d.options.length > 0) {
+    parts.push(`[옵션] ${d.options.join(" / ")}`);
   }
 
-  if (textData.reviews && textData.reviews.length > 0) {
-    parts.push(`\n[\ub9ac\ube37 (${textData.reviews.length}\uac1c)]\n${textData.reviews.slice(0, 15).join("\n")}`);
+  if (d.description) {
+    parts.push(`\n[상세 설명]\n${d.description.slice(0, 5000)}`);
   }
 
-  if (textData.inquiries && textData.inquiries.length > 0) {
-    parts.push(`\n[\uc0c1\ud488 \ubb38\uc758 (${textData.inquiries.length}\uac1c)]\n${textData.inquiries.slice(0, 10).join("\n")}`);
+  if (d.reviews && d.reviews.length > 0) {
+    parts.push(`\n[리뷰 (${d.reviews.length}개)]\n${d.reviews.slice(0, 15).join("\n")}`);
+  }
+
+  if (d.inquiries && d.inquiries.length > 0) {
+    parts.push(`\n[상품 문의 (${d.inquiries.length}개)]\n${d.inquiries.slice(0, 10).join("\n")}`);
   }
 
   if (imageUrls.length > 0) {
-    parts.push(`\n[\uc774\ubbf8\uc9c0 \uc218] \uc0c1\uc138\ud398\uc774\uc9c0\uc5d0 ${imageUrls.length}\uac1c \uc774\ubbf8\uc9c0 \ud655\uc778\ub428`);
+    parts.push(`\n[이미지 수] 상세페이지에 ${imageUrls.length}개 이미지 확인됨`);
   }
 
+  // 추출된 상품명을 로그로 확인
+  console.log(`[PageIQ] buildContentFromExtension — 상품명: "${productName}", 이미지: ${imageUrls.length}개`);
+
   return parts.join("\n");
+}
+
+// /api/analyze-extension 엔드포인트에서 productName이 빈 값이면
+// URL에서 fallback 추출하는 헬퍼
+function extractProductNameFromUrl(url: string): string {
+  if (!url) return "";
+  try {
+    const u = new URL(url);
+    const segs = u.pathname.split("/").filter(Boolean);
+    for (let i = segs.length - 1; i >= 0; i--) {
+      const decoded = decodeURIComponent(segs[i]);
+      if (/[가-힣]/.test(decoded) && decoded.length > 1) return decoded;
+    }
+  } catch {}
+  return "";
 }
